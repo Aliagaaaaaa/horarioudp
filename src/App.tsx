@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ScheduleView from './components/ScheduleView';
 import CourseSelector from './components/CourseSelector';
 import WeeklyCalendarView from './components/WeeklyCalendarView';
+import ExportImportData from './components/ExportImportData';
 import usePersistentState from './hooks/usePersistentState';
 import { CourseEdge, ScheduleData, CourseNode } from './types/course';
 import { Button } from "@/components/ui/button";
@@ -302,6 +303,11 @@ function App() {
     });
   }, [setManualCourses, setSelectedCourseIds]);
 
+  const handleImportData = useCallback((data: { selectedCourseIds: string[]; manualCourses: CourseNode[] }) => {
+    setManualCourses(data.manualCourses);
+    setSelectedCourseIds(data.selectedCourseIds);
+  }, [setManualCourses, setSelectedCourseIds]);
+
   const combinedCourses = useMemo(() => {
     const manualEdges = manualCourses.map(course => ({
       node: course
@@ -377,6 +383,11 @@ function App() {
           >
             Seleccionar Ramos
           </Button>
+          <ExportImportData 
+            selectedCourseIds={selectedCourseIds}
+            manualCourses={manualCourses}
+            onImport={handleImportData}
+          />
         </div>
       </header>
 
