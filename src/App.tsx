@@ -32,7 +32,7 @@ function App() {
     selectedCourseIdsRef.current = selectedCourseIds;
   }, [selectedCourseIds]);
 
-  const dataUrl = 'http://raw.githubusercontent.com/elmalba/data/refs/heads/main/dataa.json';
+  const dataUrl = 'http://raw.githubusercontent.com/elmalba/data/refs/heads/main/data.json';
 
   // Process API data and merge with stored data
   const processApiData = useCallback((apiEdges: CourseEdge[]) => {
