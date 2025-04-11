@@ -264,7 +264,10 @@ function App() {
       </main>
 
        <footer className="mt-8 pt-4 border-t text-center text-xs text-muted-foreground">
-            Datos obtenidos desde fuente externa. El horario puede estar sujeto a cambios.
+            <p>
+              Proyecto opensource en <a href="https://github.com/Aliagaaaaaa/horarioudp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">GitHub</a> • 
+              Sígueme en <a href="https://x.com/aliaga1337" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">X (@aliaga1337)</a>
+            </p>
       </footer>
     </div>
   );
