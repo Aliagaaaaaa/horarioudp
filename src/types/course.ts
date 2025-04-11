@@ -3,18 +3,14 @@ export interface TimeSlot {
   start: string;
   finish: string;
   place: string;
+  teacher?: string;
 }
 
 export interface CourseNode {
   code: string;
   section: number;
   course: string;
-  teacher: string;
-  place: string;
-  start: string;
-  finish: string;
-  day: number;
-  timeSlots?: TimeSlot[];
+  timeSlots: TimeSlot[];
   isManual?: boolean;
   wasUpdated?: boolean; 
   lastSeen?: number;

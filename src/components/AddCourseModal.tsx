@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CourseNode } from "../types/course";
+import { CourseNode, TimeSlot } from "../types/course";
 import {
   Dialog,
   DialogContent,
@@ -33,19 +33,19 @@ interface TimeSlotFormData {
   start: string;
   finish: string;
   place: string;
+  teacher: string;
 }
 
 const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCourseAdd }) => {
-  const [courseData, setCourseData] = useState<Partial<CourseNode>>({
+  const [courseData, setCourseData] = useState<Partial<Omit<CourseNode, "timeSlots">>>({
     code: "",
     section: 1,
     course: "",
-    teacher: "",
     isManual: true,
   });
 
   const [timeSlots, setTimeSlots] = useState<TimeSlotFormData[]>([
-    { day: 1, start: "08:30", finish: "10:00", place: "" },
+    { day: 1, start: "08:30", finish: "10:00", place: "", teacher: "" },
   ]);
 
   const handleCourseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +65,13 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
   };
 
   const addTimeSlot = () => {
-    setTimeSlots(prev => [...prev, { day: 1, start: "08:30", finish: "10:00", place: "" }]);
+    setTimeSlots(prev => [...prev, { 
+      day: 1, 
+      start: "08:30", 
+      finish: "10:00", 
+      place: "", 
+      teacher: "" 
+    }]);
   };
 
   const removeTimeSlot = (index: number) => {
@@ -91,24 +97,27 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
         alert("Por favor completa las horas de inicio y término para todos los horarios.");
         return;
       }
+      
+      if (!slot.teacher.trim()) {
+        alert("Por favor especifica un profesor para cada horario.");
+        return;
+      }
     }
+    
+    const processedTimeSlots: TimeSlot[] = timeSlots.map(slot => ({
+      day: slot.day,
+      start: slot.start,
+      finish: slot.finish,
+      place: slot.place || "No definido",
+      teacher: slot.teacher.trim() || "No definido"
+    }));
 
     const newCourse: CourseNode = {
       code: courseData.code || "",
       section: courseData.section || 1,
       course: courseData.course || "",
-      teacher: courseData.teacher || "No definido",
       isManual: true,
-      day: timeSlots[0].day,
-      start: timeSlots[0].start,
-      finish: timeSlots[0].finish,
-      place: timeSlots[0].place || "No definido",
-      timeSlots: timeSlots.map(slot => ({
-        day: slot.day,
-        start: slot.start,
-        finish: slot.finish,
-        place: slot.place || "No definido"
-      }))
+      timeSlots: processedTimeSlots
     };
 
     onCourseAdd(newCourse);
@@ -121,11 +130,10 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
       code: "",
       section: 1,
       course: "",
-      teacher: "",
       isManual: true,
     });
     setTimeSlots([
-      { day: 1, start: "08:30", finish: "10:00", place: "" }
+      { day: 1, start: "08:30", finish: "10:00", place: "", teacher: "" }
     ]);
   };
 
@@ -179,17 +187,6 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
                 value={courseData.course}
                 onChange={handleCourseChange}
                 required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="teacher">Profesor</Label>
-              <Input
-                id="teacher"
-                name="teacher"
-                placeholder="Nombre del profesor"
-                value={courseData.teacher}
-                onChange={handleCourseChange}
               />
             </div>
           </div>
@@ -276,6 +273,17 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
                       placeholder="Ej: Sala 301"
                       value={slot.place}
                       onChange={(e) => handleTimeSlotChange(index, "place", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`teacher-${index}`}>Profesor*</Label>
+                    <Input
+                      id={`teacher-${index}`}
+                      placeholder="Nombre del profesor"
+                      value={slot.teacher}
+                      onChange={(e) => handleTimeSlotChange(index, "teacher", e.target.value)}
+                      required
                     />
                   </div>
                 </div>

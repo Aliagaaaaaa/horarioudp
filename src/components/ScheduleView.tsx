@@ -8,8 +8,9 @@ interface ScheduleViewProps {
   selectedCourseIds: string[];
 }
 
-function getDayTimeKey(course: CourseNode): string {
-  return `${course.code}|${course.section}|${course.day}|${course.start}|${course.finish}|${course.place}`;
+function getTimeSlotUniqueKey(course: CourseNode, slotIndex: number): string {
+  const slot = course.timeSlots[slotIndex];
+  return `${course.code}|${course.section}|${slot.day}|${slot.start}|${slot.finish}|${slot.place}`;
 }
 
 const ScheduleView: React.FC<ScheduleViewProps> = ({ allCourses, selectedCourseIds }) => {
@@ -21,52 +22,36 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ allCourses, selectedCourseI
       .filter(edge => edge.node && selectedCourseIds.includes(getCourseId(edge.node)))
       .map(edge => edge.node);
     
-    const todayCourses = selectedCourses.filter(course => {
-      if (course.timeSlots && course.timeSlots.length > 0) {
-        return course.timeSlots.some(slot => slot.day === currentDay);
-      }
-      return course.day === currentDay;
-    });
+    const coursesWithTodaySlots: CourseNode[] = [];
+    const uniqueSlotMap = new Map<string, boolean>();
     
-    const uniqueCourses = new Map<string, CourseNode>();
-    
-    todayCourses.forEach(course => {
-      if (course.timeSlots && course.timeSlots.length > 0) {
-        course.timeSlots
-          .filter(slot => slot.day === currentDay)
-          .forEach(slot => {
-            const courseCopy = {
-              ...course,
-              day: slot.day,
-              start: slot.start,
-              finish: slot.finish,
-              place: slot.place,
-              timeSlots: [slot]
-            };
-            
-            const uniqueKey = getDayTimeKey(courseCopy);
-            if (!uniqueCourses.has(uniqueKey)) {
-              uniqueCourses.set(uniqueKey, courseCopy);
-            } else {
-              console.log('Duplicate course prevented in today view:', 
-                course.course, `${slot.start}-${slot.finish}`);
-            }
-          });
-      } else {
-        const uniqueKey = getDayTimeKey(course);
-        if (!uniqueCourses.has(uniqueKey)) {
-          uniqueCourses.set(uniqueKey, course);
-        } else {
-          console.log('Duplicate legacy course prevented in today view:', 
-            course.course, `${course.start}-${course.finish}`);
+    selectedCourses.forEach(course => {
+      const todaySlots = course.timeSlots.filter(slot => slot.day === currentDay);
+      
+      if (todaySlots.length > 0) {
+        const courseCopy = {
+          ...course,
+          timeSlots: todaySlots
+        };
+        
+        let hasUniqueSlots = false;
+        
+        courseCopy.timeSlots.forEach((_, index) => {
+          const slotKey = getTimeSlotUniqueKey(courseCopy, index);
+          if (!uniqueSlotMap.has(slotKey)) {
+            uniqueSlotMap.set(slotKey, true);
+            hasUniqueSlots = true;
+          }
+        });
+        
+        if (hasUniqueSlots) {
+          coursesWithTodaySlots.push(courseCopy);
         }
       }
     });
     
-    return Array.from(uniqueCourses.values()).sort((a, b) => {
-      const aStart = a.timeSlots?.[0]?.start || a.start;
-      const bStart = b.timeSlots?.[0]?.start || b.start;
-      return aStart.localeCompare(bStart);
+    return coursesWithTodaySlots.sort((a, b) => {
+      return a.timeSlots[0].start.localeCompare(b.timeSlots[0].start);
     });
   }, [allCourses, selectedCourseIds, currentDay]);
 
@@ -84,7 +69,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ allCourses, selectedCourseI
       ) : (
         selectedCoursesToday.map(course => (
           <CourseCard 
-            key={`${getCourseId(course)}-${course.timeSlots?.[0]?.start || course.start}`} 
+            key={`${getCourseId(course)}-${course.timeSlots[0].start}`} 
             course={course} 
           />
         ))

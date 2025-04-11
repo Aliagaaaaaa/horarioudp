@@ -1,5 +1,5 @@
 import React from 'react';
-import { CourseNode, TimeSlot } from '../types/course';
+import { CourseNode } from '../types/course';
 import { formatTime, getDayName } from '../utils/helpers';
 import {
   Card,
@@ -18,18 +18,6 @@ const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
   if (!course) return null;
 
   const locale = 'es-CL';
-  
-  const hasTimeSlots = course.timeSlots && course.timeSlots.length > 0;
-  
-  const effectiveTimeSlots: TimeSlot[] = hasTimeSlots 
-    ? course.timeSlots!
-    : [{ 
-        day: course.day, 
-        start: course.start, 
-        finish: course.finish, 
-        place: course.place 
-      }];
-
   const displaySection = typeof course.section === 'number' ? course.section : 1;
 
   return (
@@ -45,10 +33,9 @@ const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
             )}
           </div>
         </div>
-        <CardDescription>{course.teacher}</CardDescription>
       </CardHeader>
       <CardContent className="text-sm pt-2">
-        {effectiveTimeSlots.map((slot, index) => (
+        {course.timeSlots.map((slot, index) => (
           <div key={index} className={index > 0 ? "mt-2 pt-2 border-t" : ""}>
             <p>
               <span className="font-medium">Hora:</span> {formatTime(slot.start)} - {formatTime(slot.finish)}
@@ -59,6 +46,11 @@ const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
             <p>
               <span className="font-medium">Sala:</span> {slot.place}
             </p>
+            {slot.teacher && (
+              <p>
+                <span className="font-medium">Profesor:</span> {slot.teacher}
+              </p>
+            )}
           </div>
         ))}
       </CardContent>

@@ -7,51 +7,91 @@ import { CourseEdge, ScheduleData, CourseNode } from './types/course';
 import { Button } from "@/components/ui/button";
 import { getCourseId } from './utils/helpers';
 
-function getCourseUniqueKey(course: CourseNode): string {
-  return [
-    course.code || '',
-    typeof course.section === 'number' ? course.section : 1,
-    course.course || '',
-    course.teacher || '',
-    course.day || 0,
-    course.start || '',
-    course.finish || '',
-    course.place || ''
-  ].join('|');
-}
-
 function deduplicateCourses(courseEdges: CourseEdge[]): CourseEdge[] {
   const uniqueMap = new Map<string, CourseEdge>();
-  const duplicates: string[] = [];
+  let combinedCount = 0;
   
   courseEdges.forEach(edge => {
-    if (!edge.node) return;
+    if (!edge.node || !edge.node.code) return;
     
-    const uniqueKey = getCourseUniqueKey(edge.node);
+    const courseKey = `${edge.node.code}|${edge.node.section || 1}`;
     
-    if (!uniqueMap.has(uniqueKey)) {
-      uniqueMap.set(uniqueKey, edge);
+    if (!edge.node.timeSlots) {
+      if ('day' in edge.node && 'start' in edge.node && 'finish' in edge.node && 'place' in edge.node) {
+        const teacher = 'teacher' in edge.node ? (edge.node as any).teacher : "No definido";
+        
+        edge.node.timeSlots = [{
+          day: (edge.node as any).day,
+          start: (edge.node as any).start,
+          finish: (edge.node as any).finish,
+          place: (edge.node as any).place,
+          teacher: teacher
+        }];
+        
+        delete (edge.node as any).day;
+        delete (edge.node as any).start;
+        delete (edge.node as any).finish;
+        delete (edge.node as any).place;
+        delete (edge.node as any).teacher; 
+      } else {
+        edge.node.timeSlots = [];
+      }
     } else {
-      const existingCourse = uniqueMap.get(uniqueKey)?.node;
-      console.log('Duplicate course detected:', {
-        code: edge.node.code,
-        section: edge.node.section,
-        name: edge.node.course,
-        day: edge.node.day,
-        time: `${edge.node.start}-${edge.node.finish}`,
-        existing: existingCourse ? {
-          code: existingCourse.code,
-          section: existingCourse.section,
-          name: existingCourse.course
-        } : 'unknown'
+      edge.node.timeSlots.forEach(slot => {
+        if (!slot.teacher && 'teacher' in edge.node) {
+          slot.teacher = (edge.node as any).teacher || "No definido";
+        }
+        
+        if (!slot.teacher) {
+          slot.teacher = "No definido";
+        }
       });
-      duplicates.push(uniqueKey);
+      
+      if ('teacher' in edge.node) {
+        delete (edge.node as any).teacher;
+      }
+    }
+    
+    if (!uniqueMap.has(courseKey)) {
+      uniqueMap.set(courseKey, {
+        node: {
+          ...edge.node,
+          timeSlots: edge.node.timeSlots.map(slot => ({...slot}))
+        }
+      });
+    } else {
+      const existingEdge = uniqueMap.get(courseKey)!;
+      const existingCourse = existingEdge.node;
+      const newCourse = edge.node;
+      
+      combinedCount++;
+        
+      newCourse.timeSlots.forEach(newSlot => {
+        const isDuplicate = existingCourse.timeSlots.some(existingSlot => 
+          existingSlot.day === newSlot.day && 
+          existingSlot.start === newSlot.start &&
+          existingSlot.finish === newSlot.finish &&
+          existingSlot.place === newSlot.place
+        );
+        
+        if (!isDuplicate) {
+          existingCourse.timeSlots.push({...newSlot});
+        }
+      });
+      
+      existingCourse.timeSlots.sort((a, b) => {
+        if (a.day !== b.day) return a.day - b.day;
+        return a.start.localeCompare(b.start);
+      });
     }
   });
   
-  if (duplicates.length > 0) {
-    console.log(`Removed ${duplicates.length} duplicate courses`);
-  }
+  let coursesWithMultipleTimeSlots = 0;
+  uniqueMap.forEach(edge => {
+    if (edge.node.timeSlots.length > 1) {
+      coursesWithMultipleTimeSlots++;
+    }
+  });
   
   return Array.from(uniqueMap.values());
 }
@@ -90,40 +130,86 @@ function App() {
     uniqueApiEdges.forEach(edge => {
       if (!edge.node || !edge.node.code) return;
       
+      if (!edge.node.timeSlots) {
+        if ('day' in edge.node && 'start' in edge.node && 'finish' in edge.node && 'place' in edge.node) {
+          const teacher = 'teacher' in edge.node ? (edge.node as any).teacher : "No definido";
+          
+          edge.node.timeSlots = [{
+            day: (edge.node as any).day,
+            start: (edge.node as any).start,
+            finish: (edge.node as any).finish,
+            place: (edge.node as any).place,
+            teacher: teacher
+          }];
+          
+          delete (edge.node as any).day;
+          delete (edge.node as any).start;
+          delete (edge.node as any).finish;
+          delete (edge.node as any).place;
+          delete (edge.node as any).teacher;
+        } else {
+          edge.node.timeSlots = [];
+        }
+      }
+      
       const courseId = getCourseId(edge.node);
       const existingCourse = updatedStoredCourses[courseId];
       
       edge.node.lastSeen = now;
       
       if (existingCourse) {
-        const hasChanged = 
-          existingCourse.place !== edge.node.place ||
-          existingCourse.start !== edge.node.start || 
-          existingCourse.finish !== edge.node.finish ||
-          existingCourse.day !== edge.node.day ||
-          existingCourse.teacher !== edge.node.teacher;
+        let hasChanged = false;
+        
+        const timeSlotsChanged = (a: CourseNode, b: CourseNode) => {
+          if (!a.timeSlots || !b.timeSlots) return true;
+          if (a.timeSlots.length !== b.timeSlots.length) return true;
           
+          const aSlotStrings = a.timeSlots.map(slot => 
+            `${slot.day}|${slot.start}|${slot.finish}|${slot.place}|${slot.teacher || ''}`
+          ).sort();
+          
+          const bSlotStrings = b.timeSlots.map(slot => 
+            `${slot.day}|${slot.start}|${slot.finish}|${slot.place}|${slot.teacher || ''}`
+          ).sort();
+          
+          for (let i = 0; i < aSlotStrings.length; i++) {
+            if (aSlotStrings[i] !== bSlotStrings[i]) return true;
+          }
+          
+          return false;
+        };
+        
+        if (timeSlotsChanged(existingCourse, edge.node)) {
+          hasChanged = true;
+        }
+        
         if (hasChanged) {
           edge.node.wasUpdated = true;
-          if (existingCourse.timeSlots) {
-            edge.node.timeSlots = [...existingCourse.timeSlots];
-          }
           updatedCourses.push(edge.node);
+        }
+        
+        const combinedTimeSlots = [...edge.node.timeSlots];
+        
+        if (existingCourse.timeSlots) {
+          existingCourse.timeSlots.forEach(existingSlot => {
+            const isDuplicate = combinedTimeSlots.some(newSlot => 
+              newSlot.day === existingSlot.day &&
+              newSlot.start === existingSlot.start &&
+              newSlot.finish === existingSlot.finish &&
+              newSlot.place === existingSlot.place
+            );
+            
+            if (!isDuplicate) {
+              combinedTimeSlots.push({...existingSlot});
+            }
+          });
         }
         
         updatedStoredCourses[courseId] = {
           ...edge.node,
-          timeSlots: existingCourse.timeSlots || edge.node.timeSlots
+          timeSlots: combinedTimeSlots
         };
       } else {
-        if (!edge.node.timeSlots) {
-          edge.node.timeSlots = [{
-            day: edge.node.day,
-            start: edge.node.start,
-            finish: edge.node.finish,
-            place: edge.node.place
-          }];
-        }
         updatedStoredCourses[courseId] = edge.node;
       }
     });
@@ -135,13 +221,6 @@ function App() {
     });
     
     setStoredApiCourses(updatedStoredCourses);
-    
-    const updatedSelectedCourses = updatedCourses
-      .filter(course => selectedCourseIdsRef.current.includes(getCourseId(course)));
-    
-    if (updatedSelectedCourses.length > 0) {
-      console.log("Updated courses in your selection:", updatedSelectedCourses);
-    }
   }, [setStoredApiCourses]);
 
   useEffect(() => {
@@ -187,7 +266,6 @@ function App() {
         
         const storedCourseEdges = Object.values(storedApiCoursesRef.current).map(node => ({ node }));
         if (storedCourseEdges.length > 0) {
-          console.log("Using stored course data instead");
           setAllCourses(deduplicateCourses(storedCourseEdges));
         } else {
           setError(e instanceof Error ? `No se pudieron cargar los datos: ${e.message}` : "Error desconocido.");

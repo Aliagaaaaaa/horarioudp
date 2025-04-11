@@ -59,13 +59,28 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
     setSearchTerm(event.target.value);
   };
 
+  const getUniqueTeachers = (course: CourseNode) => {
+    return Array.from(
+      new Set(
+        course.timeSlots
+          .map(slot => slot.teacher)
+          .filter(Boolean)
+      )
+    );
+  };
+
   const filteredCourses = useMemo(() => {
     const searchFiltered = uniqueCourses.filter(course => {
       const lowerSearchTerm = searchTerm.toLowerCase();
+      
+      const teachersMatch = getUniqueTeachers(course).some(teacher => 
+        (teacher ?? '').toLowerCase().includes(lowerSearchTerm)
+      );
+      
       return (
           course.course.toLowerCase().includes(lowerSearchTerm) ||
           course.code.toLowerCase().includes(lowerSearchTerm) ||
-          course.teacher.toLowerCase().includes(lowerSearchTerm) ||
+          teachersMatch ||
           String(course.section).includes(lowerSearchTerm)
       );
     });
@@ -141,6 +156,7 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
 
             const isSelected = selectedCourseIds.includes(courseId);
             const displaySection = typeof course.section === 'number' ? course.section : 1;
+            const uniqueTeachers = getUniqueTeachers(course);
             
             return (
                 <div key={courseId} className="flex items-center space-x-3 mb-3 p-2 hover:bg-accent rounded transition-colors">
@@ -152,7 +168,13 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
                     />
                     <Label htmlFor={courseId} id={`${courseId}-label`} className="text-sm cursor-pointer flex-grow">
                         <span className="font-medium">{course.course}</span> ({course.code}-{displaySection})
-                        <span className="text-xs text-muted-foreground block">{course.teacher}</span>
+                        <span className="text-xs text-muted-foreground block">
+                            {uniqueTeachers.length > 0 ? (
+                                <>Profesores: {uniqueTeachers.join(', ')}</>
+                            ) : (
+                                'Sin profesor asignado'
+                            )}
+                        </span>
                         <div className="flex gap-1 mt-1">
                           {course.isManual && (
                             <Badge variant="outline">
