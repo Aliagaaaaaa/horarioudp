@@ -132,7 +132,7 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
         <DialogHeader>
           <DialogTitle>Añadir curso manualmente</DialogTitle>
           <DialogDescription>
-            Ingresa los detalles del curso para añadirlo a tu horario.
+            Ingresa la información de tu curso para agregarlo al horario. Los cursos añadidos manualmente no se actualizarán automáticamente si hay cambios en el sistema oficial. Si no encuentras tu curso, puedes agregarlo el dia que se imparte(Deberia aparecer automaticamente).
           </DialogDescription>
         </DialogHeader>
 
