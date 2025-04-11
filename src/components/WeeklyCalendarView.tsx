@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { CourseEdge, CourseNode, TimeSlot } from '../types/course';
+import { CourseEdge, CourseNode } from '../types/course';
 import { getCourseId, getDayName } from '../utils/helpers';
 import CourseCard from './CourseCard';
 

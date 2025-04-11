@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CourseNode, TimeSlot } from "../types/course";
+import { CourseNode } from "../types/course";
 import {
   Dialog,
   DialogContent,

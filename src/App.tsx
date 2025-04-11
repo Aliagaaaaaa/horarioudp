@@ -3,7 +3,7 @@ import ScheduleView from './components/ScheduleView';
 import CourseSelector from './components/CourseSelector';
 import WeeklyCalendarView from './components/WeeklyCalendarView';
 import usePersistentState from './hooks/usePersistentState';
-import { CourseEdge, ScheduleData, CourseNode, TimeSlot } from './types/course';
+import { CourseEdge, ScheduleData, CourseNode } from './types/course';
 import { Button } from "@/components/ui/button";
 import { getCourseId } from './utils/helpers';
 
