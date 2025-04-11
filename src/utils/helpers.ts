@@ -7,11 +7,14 @@ import { CourseNode } from '../types/course';
  */
 
 export const getCourseId = (courseNode: CourseNode | null | undefined): string => {
-  if (!courseNode || typeof courseNode.code !== 'string' || typeof courseNode.section !== 'number') {
+  if (!courseNode || typeof courseNode.code !== 'string') {
      console.error("Invalid course node for ID generation:", courseNode);
      return `invalid-${Math.random().toString(36).substring(7)}`;
   }
-  return `${courseNode.code}-${courseNode.section}`;
+  
+  // Use section if available, otherwise default to 1
+  const section = (typeof courseNode.section === 'number') ? courseNode.section : 1;
+  return `${courseNode.code}-${section}`;
 };
 
 /**

@@ -142,6 +142,9 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
             if (!courseId || courseId.startsWith('invalid-')) return null;
 
             const isSelected = selectedCourseIds.includes(courseId);
+            // Ensure section has a default value of 1 if undefined or null
+            const displaySection = typeof course.section === 'number' ? course.section : 1;
+            
             return (
                 <div key={courseId} className="flex items-center space-x-3 mb-3 p-2 hover:bg-accent rounded transition-colors">
                     <Checkbox
@@ -151,7 +154,7 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
                         aria-labelledby={`${courseId}-label`}
                     />
                     <Label htmlFor={courseId} id={`${courseId}-label`} className="text-sm cursor-pointer flex-grow">
-                        <span className="font-medium">{course.course}</span> ({course.code}-{course.section})
+                        <span className="font-medium">{course.course}</span> ({course.code}-{displaySection})
                         <span className="text-xs text-muted-foreground block">{course.teacher}</span>
                         <div className="flex gap-1 mt-1">
                           {course.isManual && (

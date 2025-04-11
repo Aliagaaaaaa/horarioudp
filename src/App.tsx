@@ -3,9 +3,67 @@ import ScheduleView from './components/ScheduleView';
 import CourseSelector from './components/CourseSelector';
 import WeeklyCalendarView from './components/WeeklyCalendarView';
 import usePersistentState from './hooks/usePersistentState';
-import { CourseEdge, ScheduleData, CourseNode } from './types/course';
+import { CourseEdge, ScheduleData, CourseNode, TimeSlot } from './types/course';
 import { Button } from "@/components/ui/button";
 import { getCourseId } from './utils/helpers';
+
+/**
+ * Creates a unique key for a course based on all its relevant properties
+ */
+function getCourseUniqueKey(course: CourseNode): string {
+  // Create a composite key with all properties that should make a course unique
+  return [
+    course.code || '',
+    typeof course.section === 'number' ? course.section : 1,
+    course.course || '',
+    course.teacher || '',
+    course.day || 0,
+    course.start || '',
+    course.finish || '',
+    course.place || ''
+  ].join('|');
+}
+
+/**
+ * Removes duplicate courses from an array of course edges
+ */
+function deduplicateCourses(courseEdges: CourseEdge[]): CourseEdge[] {
+  const uniqueMap = new Map<string, CourseEdge>();
+  const duplicates: string[] = [];
+  
+  courseEdges.forEach(edge => {
+    if (!edge.node) return;
+    
+    const uniqueKey = getCourseUniqueKey(edge.node);
+    
+    // Only add this course if we haven't seen this exact combination before
+    if (!uniqueMap.has(uniqueKey)) {
+      uniqueMap.set(uniqueKey, edge);
+    } else {
+      // Log detailed information about the duplicate
+      const existingCourse = uniqueMap.get(uniqueKey)?.node;
+      console.log('Duplicate course detected:', {
+        code: edge.node.code,
+        section: edge.node.section,
+        name: edge.node.course,
+        day: edge.node.day,
+        time: `${edge.node.start}-${edge.node.finish}`,
+        existing: existingCourse ? {
+          code: existingCourse.code,
+          section: existingCourse.section,
+          name: existingCourse.course
+        } : 'unknown'
+      });
+      duplicates.push(uniqueKey);
+    }
+  });
+  
+  if (duplicates.length > 0) {
+    console.log(`Removed ${duplicates.length} duplicate courses`);
+  }
+  
+  return Array.from(uniqueMap.values());
+}
 
 type ViewState = 'today' | 'week' | 'selector';
 
@@ -40,8 +98,11 @@ function App() {
     const updatedStoredCourses = { ...storedApiCoursesRef.current };
     const updatedCourses: CourseNode[] = [];
     
+    // First, deduplicate the API edges based on all relevant properties
+    const uniqueApiEdges = deduplicateCourses(apiEdges);
+    
     // Process each course from API
-    apiEdges.forEach(edge => {
+    uniqueApiEdges.forEach(edge => {
       if (!edge.node || !edge.node.code) return;
       
       const courseId = getCourseId(edge.node);
@@ -60,10 +121,10 @@ function App() {
           existingCourse.teacher !== edge.node.teacher;
           
         if (hasChanged) {
-          // If changed, mark as updated and preserve any days info we had before
+          // If changed, mark as updated and preserve any timeSlots info we had before
           edge.node.wasUpdated = true;
-          if (existingCourse.days) {
-            edge.node.days = [...existingCourse.days];
+          if (existingCourse.timeSlots) {
+            edge.node.timeSlots = [...existingCourse.timeSlots];
           }
           updatedCourses.push(edge.node);
         }
@@ -71,10 +132,19 @@ function App() {
         // Update the stored course
         updatedStoredCourses[courseId] = {
           ...edge.node,
-          // Preserve days data if it exists
-          days: existingCourse.days || edge.node.days
+          // Preserve timeSlots data if it exists
+          timeSlots: existingCourse.timeSlots || edge.node.timeSlots
         };
       } else {
+        // For new courses, create a timeSlots entry from the single s/time info
+        if (!edge.node.timeSlots) {
+          edge.node.timeSlots = [{
+            day: edge.node.day,
+            start: edge.node.start,
+            finish: edge.node.finish,
+            place: edge.node.place
+          }];
+        }
         // New course, add to stored courses
         updatedStoredCourses[courseId] = edge.node;
       }
@@ -86,7 +156,7 @@ function App() {
       // If the course wasn't seen in this update but is selected
       if (course.lastSeen !== now && selectedCourseIdsRef.current.includes(id)) {
         // Include this course in the API edges so it's still visible
-        apiEdges.push({ node: { ...course } });
+        uniqueApiEdges.push({ node: { ...course } });
       }
     });
     
@@ -94,13 +164,11 @@ function App() {
     setStoredApiCourses(updatedStoredCourses);
     
     // If any courses were updated and are in the selected list, notify user
-    // This could be enhanced with a toast notification
     const updatedSelectedCourses = updatedCourses
       .filter(course => selectedCourseIdsRef.current.includes(getCourseId(course)));
     
     if (updatedSelectedCourses.length > 0) {
       console.log("Updated courses in your selection:", updatedSelectedCourses);
-      // You could add a toast notification here
     }
   }, [setStoredApiCourses]);
 
@@ -118,15 +186,31 @@ function App() {
             jsonData?.data?.allSalasUdps?.edges &&
             Array.isArray(jsonData.data.allSalasUdps.edges)
             ) {
-            const validEdges = jsonData.data.allSalasUdps.edges.filter(edge =>
-                edge?.node?.code && typeof edge.node.section === 'number'
-            );
+            // Process edges and add default section number if missing
+            const processedEdges = jsonData.data.allSalasUdps.edges
+              .filter(edge => edge?.node?.code) // Only filter by code requirement
+              .map(edge => {
+                // If section is missing, set default to 1
+                if (edge.node && edge.node.code && edge.node.section === undefined) {
+                  return {
+                    ...edge,
+                    node: {
+                      ...edge.node,
+                      section: 1 // Set default section to 1
+                    }
+                  };
+                }
+                return edge;
+              });
+            
+            // Deduplicate courses before processing
+            const uniqueEdges = deduplicateCourses(processedEdges);
             
             // Process API data and merge with stored data
-            processApiData(validEdges);
+            processApiData(uniqueEdges);
             
-            // Update allCourses state
-            setAllCourses(validEdges);
+            // Update allCourses state with deduplicated courses
+            setAllCourses(uniqueEdges);
         } else {
             console.error("Data structure validation failed:", jsonData);
             throw new Error("La estructura de los datos recibidos no es la esperada.");
@@ -138,7 +222,8 @@ function App() {
         const storedCourseEdges = Object.values(storedApiCoursesRef.current).map(node => ({ node }));
         if (storedCourseEdges.length > 0) {
           console.log("Using stored course data instead");
-          setAllCourses(storedCourseEdges);
+          // Deduplicate stored courses too
+          setAllCourses(deduplicateCourses(storedCourseEdges));
         } else {
           // Only set error if there's no stored data to fall back to
           setError(e instanceof Error ? `No se pudieron cargar los datos: ${e.message}` : "Error desconocido.");
@@ -185,7 +270,8 @@ function App() {
     const manualEdges = manualCourses.map(course => ({
       node: course
     }));
-    return [...allCourses, ...manualEdges];
+    // Deduplicate the combination of API and manual courses
+    return deduplicateCourses([...allCourses, ...manualEdges]);
   }, [allCourses, manualCourses]);
 
    if (isLoading) {

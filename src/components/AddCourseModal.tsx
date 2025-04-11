@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CourseNode } from "../types/course";
+import { CourseNode, TimeSlot } from "../types/course";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, X } from "lucide-react";
 
 interface AddCourseModalProps {
   isOpen: boolean;
@@ -27,37 +28,51 @@ const DAYS_OF_WEEK = [
   { value: 5, label: "Viernes" },
 ];
 
+interface TimeSlotFormData {
+  day: number;
+  start: string;
+  finish: string;
+  place: string;
+}
+
 const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCourseAdd }) => {
-  const [formData, setFormData] = useState<Partial<CourseNode>>({
+  const [courseData, setCourseData] = useState<Partial<CourseNode>>({
     code: "",
     section: 1,
     course: "",
-    place: "",
-    start: "08:30",
-    finish: "10:00",
-    day: 1, // Default day for backwards compatibility
     teacher: "",
     isManual: true,
   });
 
-  const [selectedDays, setSelectedDays] = useState<number[]>([1]); // Default to Monday
+  // Array of time slots for the course
+  const [timeSlots, setTimeSlots] = useState<TimeSlotFormData[]>([
+    { day: 1, start: "08:30", finish: "10:00", place: "" },
+  ]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCourseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setCourseData((prev) => ({
       ...prev,
       [name]: name === "section" ? parseInt(value, 10) : value,
     }));
   };
 
-  const handleDayToggle = (day: number) => {
-    setSelectedDays(prev => {
-      if (prev.includes(day)) {
-        return prev.filter(d => d !== day);
-      } else {
-        return [...prev, day].sort();
-      }
+  const handleTimeSlotChange = (index: number, field: keyof TimeSlotFormData, value: string | number) => {
+    setTimeSlots(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
     });
+  };
+
+  const addTimeSlot = () => {
+    setTimeSlots(prev => [...prev, { day: 1, start: "08:30", finish: "10:00", place: "" }]);
+  };
+
+  const removeTimeSlot = (index: number) => {
+    if (timeSlots.length > 1) {
+      setTimeSlots(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,189 +80,218 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
     
     // Validate form
     if (
-      !formData.code ||
-      !formData.course ||
-      !formData.start ||
-      !formData.finish ||
-      selectedDays.length === 0
+      !courseData.code ||
+      !courseData.course ||
+      timeSlots.length === 0
     ) {
-      alert("Por favor completa todos los campos obligatorios y selecciona al menos un día.");
+      alert("Por favor completa todos los campos obligatorios y añade al menos un horario.");
       return;
     }
 
-    // Create course base with all required fields
-    const courseBase: Omit<CourseNode, 'day'> = {
-      code: formData.code || "",
-      section: formData.section || 1,
-      course: formData.course || "",
-      place: formData.place || "No definido",
-      start: formData.start || "00:00",
-      finish: formData.finish || "00:00",
-      days: selectedDays,
-      teacher: formData.teacher || "No definido",
-      isManual: true,
-    };
-
-    // For each selected day, create a course instance
-    if (selectedDays.length === 1) {
-      // If only one day is selected, use the simple approach
-      const newCourse: CourseNode = {
-        ...courseBase,
-        day: selectedDays[0],
-      };
-      onCourseAdd(newCourse);
-    } else {
-      // For multiple days, create individual courses
-      selectedDays.forEach(day => {
-        const newCourse: CourseNode = {
-          ...courseBase,
-          day: day,
-        };
-        onCourseAdd(newCourse);
-      });
+    // Validate each time slot
+    for (const slot of timeSlots) {
+      if (!slot.start || !slot.finish) {
+        alert("Por favor completa las horas de inicio y término para todos los horarios.");
+        return;
+      }
     }
 
+    // Create the new course with time slots
+    const newCourse: CourseNode = {
+      code: courseData.code || "",
+      section: courseData.section || 1,
+      course: courseData.course || "",
+      teacher: courseData.teacher || "No definido",
+      isManual: true,
+      // Legacy fields - use the first time slot for compatibility
+      day: timeSlots[0].day,
+      start: timeSlots[0].start,
+      finish: timeSlots[0].finish,
+      place: timeSlots[0].place || "No definido",
+      // New timeSlots field with all time slots
+      timeSlots: timeSlots.map(slot => ({
+        day: slot.day,
+        start: slot.start,
+        finish: slot.finish,
+        place: slot.place || "No definido"
+      }))
+    };
+
+    onCourseAdd(newCourse);
     resetForm();
     onClose();
   };
 
   const resetForm = () => {
-    setFormData({
+    setCourseData({
       code: "",
       section: 1,
       course: "",
-      place: "",
-      start: "08:30",
-      finish: "10:00",
-      day: 1,
       teacher: "",
       isManual: true,
     });
-    setSelectedDays([1]);
+    setTimeSlots([
+      { day: 1, start: "08:30", finish: "10:00", place: "" }
+    ]);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Añadir curso manualmente</DialogTitle>
           <DialogDescription>
-            Ingresa la información de tu curso para agregarlo al horario. Los cursos añadidos manualmente no se actualizarán automáticamente si hay cambios en el sistema oficial. Si no encuentras tu curso, puedes agregarlo el dia que se imparte(Deberia aparecer automaticamente).
+            Ingresa la información de tu curso para agregarlo al horario. Los cursos pueden tener múltiples días con diferentes horarios.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="code">Código del curso*</Label>
-              <Input
-                id="code"
-                name="code"
-                placeholder="Ej: CIT1337"
-                value={formData.code}
-                onChange={handleChange}
-                required
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium">Información del curso</h3>
             
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="code">Código del curso*</Label>
+                <Input
+                  id="code"
+                  name="code"
+                  placeholder="Ej: CIT1337"
+                  value={courseData.code}
+                  onChange={handleCourseChange}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="section">Sección</Label>
+                <Input
+                  id="section"
+                  name="section"
+                  type="number"
+                  min="1"
+                  value={courseData.section}
+                  onChange={handleCourseChange}
+                  required
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="section">Sección</Label>
+              <Label htmlFor="course">Nombre del curso*</Label>
               <Input
-                id="section"
-                name="section"
-                type="number"
-                min="1"
-                value={formData.section}
-                onChange={handleChange}
+                id="course"
+                name="course"
+                placeholder="Nombre del curso"
+                value={courseData.course}
+                onChange={handleCourseChange}
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="teacher">Profesor</Label>
+              <Input
+                id="teacher"
+                name="teacher"
+                placeholder="Nombre del profesor"
+                value={courseData.teacher}
+                onChange={handleCourseChange}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="course">Nombre del curso*</Label>
-            <Input
-              id="course"
-              name="course"
-              placeholder="Nombre del curso"
-              value={formData.course}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start">Hora de inicio*</Label>
-              <Input
-                id="start"
-                name="start"
-                type="time"
-                value={formData.start}
-                onChange={handleChange}
-                required
-              />
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium">Horarios del curso</h3>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={addTimeSlot}
+                className="h-8"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Añadir horario
+              </Button>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="finish">Hora de término*</Label>
-              <Input
-                id="finish"
-                name="finish"
-                type="time"
-                value={formData.finish}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Días de la semana*</Label>
-            <div className="grid grid-cols-3 gap-2 mt-1">
-              {DAYS_OF_WEEK.map((day) => (
-                <div key={day.value} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`day-${day.value}`}
-                    checked={selectedDays.includes(day.value)}
-                    onCheckedChange={() => handleDayToggle(day.value)}
-                  />
-                  <Label htmlFor={`day-${day.value}`} className="text-sm cursor-pointer">
-                    {day.label}
-                  </Label>
+            {timeSlots.map((slot, index) => (
+              <div key={index} className="p-3 border rounded-md space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-medium">Horario {index + 1}</h4>
+                  {timeSlots.length > 1 && (
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => removeTimeSlot(index)}
+                      className="h-6 w-6"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              ))}
-            </div>
-            {selectedDays.length === 0 && (
-              <p className="text-xs text-red-500 mt-1">Selecciona al menos un día</p>
-            )}
-          </div>
+                
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Día de la semana*</Label>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      {DAYS_OF_WEEK.map((day) => (
+                        <div key={day.value} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`day-${index}-${day.value}`}
+                            checked={slot.day === day.value}
+                            onCheckedChange={() => handleTimeSlotChange(index, "day", day.value)}
+                          />
+                          <Label htmlFor={`day-${index}-${day.value}`} className="text-sm cursor-pointer">
+                            {day.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="place">Sala/Lugar</Label>
-            <Input
-              id="place"
-              name="place"
-              placeholder="Ej: Sala 301"
-              value={formData.place}
-              onChange={handleChange}
-            />
-          </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`start-${index}`}>Hora de inicio*</Label>
+                      <Input
+                        id={`start-${index}`}
+                        type="time"
+                        value={slot.start}
+                        onChange={(e) => handleTimeSlotChange(index, "start", e.target.value)}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor={`finish-${index}`}>Hora de término*</Label>
+                      <Input
+                        id={`finish-${index}`}
+                        type="time"
+                        value={slot.finish}
+                        onChange={(e) => handleTimeSlotChange(index, "finish", e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="teacher">Profesor</Label>
-            <Input
-              id="teacher"
-              name="teacher"
-              placeholder="Nombre del profesor"
-              value={formData.teacher}
-              onChange={handleChange}
-            />
+                  <div className="space-y-2">
+                    <Label htmlFor={`place-${index}`}>Sala/Lugar</Label>
+                    <Input
+                      id={`place-${index}`}
+                      placeholder="Ej: Sala 301"
+                      value={slot.place}
+                      onChange={(e) => handleTimeSlotChange(index, "place", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <DialogFooter className="pt-4">
             <Button onClick={onClose} variant="outline" type="button">Cancelar</Button>
-            <Button type="submit" disabled={selectedDays.length === 0}>Añadir curso</Button>
+            <Button type="submit">Añadir curso</Button>
           </DialogFooter>
         </form>
       </DialogContent>
