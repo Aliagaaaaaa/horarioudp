@@ -44,7 +44,6 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
     isManual: true,
   });
 
-  // Array of time slots for the course
   const [timeSlots, setTimeSlots] = useState<TimeSlotFormData[]>([
     { day: 1, start: "08:30", finish: "10:00", place: "" },
   ]);
@@ -78,7 +77,6 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
     if (
       !courseData.code ||
       !courseData.course ||
@@ -88,7 +86,6 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
       return;
     }
 
-    // Validate each time slot
     for (const slot of timeSlots) {
       if (!slot.start || !slot.finish) {
         alert("Por favor completa las horas de inicio y término para todos los horarios.");
@@ -96,19 +93,16 @@ const AddCourseModal: React.FC<AddCourseModalProps> = ({ isOpen, onClose, onCour
       }
     }
 
-    // Create the new course with time slots
     const newCourse: CourseNode = {
       code: courseData.code || "",
       section: courseData.section || 1,
       course: courseData.course || "",
       teacher: courseData.teacher || "No definido",
       isManual: true,
-      // Legacy fields - use the first time slot for compatibility
       day: timeSlots[0].day,
       start: timeSlots[0].start,
       finish: timeSlots[0].finish,
       place: timeSlots[0].place || "No definido",
-      // New timeSlots field with all time slots
       timeSlots: timeSlots.map(slot => ({
         day: slot.day,
         start: slot.start,

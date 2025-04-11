@@ -12,7 +12,6 @@ export const getCourseId = (courseNode: CourseNode | null | undefined): string =
      return `invalid-${Math.random().toString(36).substring(7)}`;
   }
   
-  // Use section if available, otherwise default to 1
   const section = (typeof courseNode.section === 'number') ? courseNode.section : 1;
   return `${courseNode.code}-${section}`;
 };

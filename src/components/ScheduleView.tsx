@@ -8,7 +8,6 @@ interface ScheduleViewProps {
   selectedCourseIds: string[];
 }
 
-// Helper function to create a unique key for courses on the same day and time
 function getDayTimeKey(course: CourseNode): string {
   return `${course.code}|${course.section}|${course.day}|${course.start}|${course.finish}|${course.place}`;
 }
@@ -18,30 +17,24 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ allCourses, selectedCourseI
   const locale = 'es-CL';
 
   const selectedCoursesToday = useMemo(() => {
-    // Get all selected courses
     const selectedCourses = allCourses
       .filter(edge => edge.node && selectedCourseIds.includes(getCourseId(edge.node)))
       .map(edge => edge.node);
     
-    // Filter for courses that happen today
     const todayCourses = selectedCourses.filter(course => {
-      // Check if the course has the current day, either in timeSlots or in the legacy day property
       if (course.timeSlots && course.timeSlots.length > 0) {
         return course.timeSlots.some(slot => slot.day === currentDay);
       }
       return course.day === currentDay;
     });
     
-    // Deduplicate courses using a Map
     const uniqueCourses = new Map<string, CourseNode>();
     
     todayCourses.forEach(course => {
-      // For courses with timeSlots, handle each slot separately
       if (course.timeSlots && course.timeSlots.length > 0) {
         course.timeSlots
           .filter(slot => slot.day === currentDay)
           .forEach(slot => {
-            // Create a copy of the course with only this time slot
             const courseCopy = {
               ...course,
               day: slot.day,
@@ -60,7 +53,6 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ allCourses, selectedCourseI
             }
           });
       } else {
-        // Legacy mode - single day/time
         const uniqueKey = getDayTimeKey(course);
         if (!uniqueCourses.has(uniqueKey)) {
           uniqueCourses.set(uniqueKey, course);
@@ -71,7 +63,6 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ allCourses, selectedCourseI
       }
     });
     
-    // Sort by start time
     return Array.from(uniqueCourses.values()).sort((a, b) => {
       const aStart = a.timeSlots?.[0]?.start || a.start;
       const bStart = b.timeSlots?.[0]?.start || b.start;

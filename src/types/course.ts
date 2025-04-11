@@ -10,16 +10,14 @@ export interface CourseNode {
   section: number;
   course: string;
   teacher: string;
-  // Legacy properties for backward compatibility
   place: string;
   start: string;
   finish: string;
   day: number;
-  // New property for multiple days and time slots
   timeSlots?: TimeSlot[];
   isManual?: boolean;
-  wasUpdated?: boolean; // Flag to identify recently updated courses
-  lastSeen?: number;    // Timestamp when the course was last seen in API
+  wasUpdated?: boolean; 
+  lastSeen?: number;
 }
   
 export interface CourseEdge {

@@ -7,11 +7,7 @@ import { CourseEdge, ScheduleData, CourseNode } from './types/course';
 import { Button } from "@/components/ui/button";
 import { getCourseId } from './utils/helpers';
 
-/**
- * Creates a unique key for a course based on all its relevant properties
- */
 function getCourseUniqueKey(course: CourseNode): string {
-  // Create a composite key with all properties that should make a course unique
   return [
     course.code || '',
     typeof course.section === 'number' ? course.section : 1,
@@ -24,9 +20,6 @@ function getCourseUniqueKey(course: CourseNode): string {
   ].join('|');
 }
 
-/**
- * Removes duplicate courses from an array of course edges
- */
 function deduplicateCourses(courseEdges: CourseEdge[]): CourseEdge[] {
   const uniqueMap = new Map<string, CourseEdge>();
   const duplicates: string[] = [];
@@ -36,11 +29,9 @@ function deduplicateCourses(courseEdges: CourseEdge[]): CourseEdge[] {
     
     const uniqueKey = getCourseUniqueKey(edge.node);
     
-    // Only add this course if we haven't seen this exact combination before
     if (!uniqueMap.has(uniqueKey)) {
       uniqueMap.set(uniqueKey, edge);
     } else {
-      // Log detailed information about the duplicate
       const existingCourse = uniqueMap.get(uniqueKey)?.node;
       console.log('Duplicate course detected:', {
         code: edge.node.code,
@@ -70,18 +61,15 @@ type ViewState = 'today' | 'week' | 'selector';
 function App() {
   const [allCourses, setAllCourses] = useState<CourseEdge[]>([]);
   const [manualCourses, setManualCourses] = usePersistentState<CourseNode[]>('manualCourses', []);
-  // Add a persistent store for all API courses that have been seen
   const [storedApiCourses, setStoredApiCourses] = usePersistentState<Record<string, CourseNode>>('storedApiCourses', {});
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCourseIds, setSelectedCourseIds] = usePersistentState<string[]>('selectedCourses', []);
   const [currentView, setCurrentView] = useState<ViewState>('today');
 
-  // Use refs to avoid dependency cycles with stored values
   const storedApiCoursesRef = useRef(storedApiCourses);
   const selectedCourseIdsRef = useRef(selectedCourseIds);
 
-  // Update refs when values change
   useEffect(() => {
     storedApiCoursesRef.current = storedApiCourses;
   }, [storedApiCourses]);
@@ -92,27 +80,22 @@ function App() {
 
   const dataUrl = 'https://raw.githubusercontent.com/elmalba/data/refs/heads/main/data.json';
 
-  // Process API data and merge with stored data
   const processApiData = useCallback((apiEdges: CourseEdge[]) => {
     const now = Date.now();
     const updatedStoredCourses = { ...storedApiCoursesRef.current };
     const updatedCourses: CourseNode[] = [];
     
-    // First, deduplicate the API edges based on all relevant properties
     const uniqueApiEdges = deduplicateCourses(apiEdges);
     
-    // Process each course from API
     uniqueApiEdges.forEach(edge => {
       if (!edge.node || !edge.node.code) return;
       
       const courseId = getCourseId(edge.node);
       const existingCourse = updatedStoredCourses[courseId];
       
-      // Mark the current timestamp
       edge.node.lastSeen = now;
       
       if (existingCourse) {
-        // Check if any important fields have changed
         const hasChanged = 
           existingCourse.place !== edge.node.place ||
           existingCourse.start !== edge.node.start || 
@@ -121,7 +104,6 @@ function App() {
           existingCourse.teacher !== edge.node.teacher;
           
         if (hasChanged) {
-          // If changed, mark as updated and preserve any timeSlots info we had before
           edge.node.wasUpdated = true;
           if (existingCourse.timeSlots) {
             edge.node.timeSlots = [...existingCourse.timeSlots];
@@ -129,14 +111,11 @@ function App() {
           updatedCourses.push(edge.node);
         }
         
-        // Update the stored course
         updatedStoredCourses[courseId] = {
           ...edge.node,
-          // Preserve timeSlots data if it exists
           timeSlots: existingCourse.timeSlots || edge.node.timeSlots
         };
       } else {
-        // For new courses, create a timeSlots entry from the single s/time info
         if (!edge.node.timeSlots) {
           edge.node.timeSlots = [{
             day: edge.node.day,
@@ -145,25 +124,18 @@ function App() {
             place: edge.node.place
           }];
         }
-        // New course, add to stored courses
         updatedStoredCourses[courseId] = edge.node;
       }
     });
     
-    // Look for courses that were in the stored data but not in the new API data
-    // These might be courses that are not showing up in the API temporarily
     Object.entries(updatedStoredCourses).forEach(([id, course]) => {
-      // If the course wasn't seen in this update but is selected
       if (course.lastSeen !== now && selectedCourseIdsRef.current.includes(id)) {
-        // Include this course in the API edges so it's still visible
         uniqueApiEdges.push({ node: { ...course } });
       }
     });
     
-    // Save the updated stored courses
     setStoredApiCourses(updatedStoredCourses);
     
-    // If any courses were updated and are in the selected list, notify user
     const updatedSelectedCourses = updatedCourses
       .filter(course => selectedCourseIdsRef.current.includes(getCourseId(course)));
     
@@ -186,30 +158,25 @@ function App() {
             jsonData?.data?.allSalasUdps?.edges &&
             Array.isArray(jsonData.data.allSalasUdps.edges)
             ) {
-            // Process edges and add default section number if missing
             const processedEdges = jsonData.data.allSalasUdps.edges
-              .filter(edge => edge?.node?.code) // Only filter by code requirement
+              .filter(edge => edge?.node?.code)
               .map(edge => {
-                // If section is missing, set default to 1
                 if (edge.node && edge.node.code && edge.node.section === undefined) {
                   return {
                     ...edge,
                     node: {
                       ...edge.node,
-                      section: 1 // Set default section to 1
+                      section: 1
                     }
                   };
                 }
                 return edge;
               });
             
-            // Deduplicate courses before processing
             const uniqueEdges = deduplicateCourses(processedEdges);
             
-            // Process API data and merge with stored data
             processApiData(uniqueEdges);
             
-            // Update allCourses state with deduplicated courses
             setAllCourses(uniqueEdges);
         } else {
             console.error("Data structure validation failed:", jsonData);
@@ -218,14 +185,11 @@ function App() {
       } catch (e: unknown) {
         console.error("Error al obtener los datos de los cursos:", e);
         
-        // Use stored data without setting an error
         const storedCourseEdges = Object.values(storedApiCoursesRef.current).map(node => ({ node }));
         if (storedCourseEdges.length > 0) {
           console.log("Using stored course data instead");
-          // Deduplicate stored courses too
           setAllCourses(deduplicateCourses(storedCourseEdges));
         } else {
-          // Only set error if there's no stored data to fall back to
           setError(e instanceof Error ? `No se pudieron cargar los datos: ${e.message}` : "Error desconocido.");
         }
       } finally {
@@ -233,8 +197,6 @@ function App() {
       }
     };
     fetchData();
-    // Remove storedApiCourses and selectedCourseIds from dependencies 
-    // and use refs instead
   }, [dataUrl, processApiData]);
 
   const handleSelectionChange = useCallback((courseId: string, isChecked: boolean) => {
@@ -250,13 +212,10 @@ function App() {
   }, [setSelectedCourseIds]);
 
   const handleAddManualCourse = useCallback((course: CourseNode) => {
-    // Generate a unique ID for the manual course
     const courseId = getCourseId(course);
     
-    // Add the course to manual courses
     setManualCourses(prev => [...prev, course]);
     
-    // Also select it
     setSelectedCourseIds(prev => {
       if (!prev.includes(courseId)) {
         return [...prev, courseId];
@@ -265,12 +224,10 @@ function App() {
     });
   }, [setManualCourses, setSelectedCourseIds]);
 
-  // Combine API courses with manual courses
   const combinedCourses = useMemo(() => {
     const manualEdges = manualCourses.map(course => ({
       node: course
     }));
-    // Deduplicate the combination of API and manual courses
     return deduplicateCourses([...allCourses, ...manualEdges]);
   }, [allCourses, manualCourses]);
 
@@ -315,7 +272,7 @@ function App() {
   }
 
   return (
-    <div className="container mx-auto p-4 font-sans max-w-6xl"> {/* Increased max-width for week view */}
+    <div className="container mx-auto p-4 font-sans max-w-6xl">
       <header className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
           Mi Horario de Clases

@@ -60,7 +60,6 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
   };
 
   const filteredCourses = useMemo(() => {
-    // First filter by search term
     const searchFiltered = uniqueCourses.filter(course => {
       const lowerSearchTerm = searchTerm.toLowerCase();
       return (
@@ -71,7 +70,6 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
       );
     });
     
-    // Then filter by selection status if needed
     if (viewMode === 'selected') {
       return searchFiltered.filter(course => 
         selectedCourseIds.includes(getCourseId(course))
@@ -142,7 +140,6 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
             if (!courseId || courseId.startsWith('invalid-')) return null;
 
             const isSelected = selectedCourseIds.includes(courseId);
-            // Ensure section has a default value of 1 if undefined or null
             const displaySection = typeof course.section === 'number' ? course.section : 1;
             
             return (

@@ -19,10 +19,8 @@ const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
 
   const locale = 'es-CL';
   
-  // Handle whether we're using the new timeSlots array or legacy properties
   const hasTimeSlots = course.timeSlots && course.timeSlots.length > 0;
   
-  // If using legacy format, create a single time slot from existing properties
   const effectiveTimeSlots: TimeSlot[] = hasTimeSlots 
     ? course.timeSlots!
     : [{ 
@@ -32,7 +30,6 @@ const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
         place: course.place 
       }];
 
-  // Ensure section has a default value of 1 if undefined or null
   const displaySection = typeof course.section === 'number' ? course.section : 1;
 
   return (
